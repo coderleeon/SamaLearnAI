@@ -1,0 +1,26 @@
+# FastAPI
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+sse-starlette>=2.3.0
+python-multipart>=0.0.20
+
+# LangChain + LangGraph
+langchain>=0.3.25
+langchain-google-genai>=2.1.5
+langchain-text-splitters>=0.3.8
+langgraph>=0.4.7
+
+# Supabase
+supabase>=2.15.0
+
+# Parsers
+pymupdf>=1.25.0
+python-pptx>=1.0.0
+youtube-transcript-api>=1.2.3
+httpx>=0.28.0
+beautifulsoup4>=4.13.0
+
+# Utilities
+pydantic>=2.11.0
+pydantic-settings>=2.9.0
+python-dotenv>=1.1.0
