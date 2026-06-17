@@ -78,7 +78,7 @@ app.include_router(sessions_router, prefix="/api/v1", tags=["sessions"])
 app.include_router(sources_router, prefix="/api/v1", tags=["sources"])
 app.include_router(chat_router, prefix="/api/v1", tags=["chat"])
 
-# Phase 4+: Course planner routes
-# from backend.api.courses import router as courses_router
-# app.include_router(courses_router, prefix="/api/v1", tags=["courses"])
+# Task 2: Course planner routes
+from backend.api.courses import router as courses_router
+app.include_router(courses_router, prefix="/api/v1", tags=["courses"])
 
