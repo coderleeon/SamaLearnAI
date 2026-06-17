@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str | None = None
     GEMINI_CHAT_MODEL: str = "gemini-2.5-flash"
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-001"
-    EMBEDDING_DIMENSIONS: int = 3072
+    EMBEDDING_DIMENSIONS: int = 768
 
     # --- OpenRouter ---
     OPENROUTER_API_KEY: str | None = None

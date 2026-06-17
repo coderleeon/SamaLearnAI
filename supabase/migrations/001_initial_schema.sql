@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source_id UUID NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
-    embedding vector(3072),
+    embedding vector(768),
     metadata JSONB NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -88,7 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_course_plans_session
 -- Vector similarity search function
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION match_chunks(
-    query_embedding vector(3072),
+    query_embedding vector(768),
     filter_session_id UUID,
     match_count INT DEFAULT 5,
     match_threshold FLOAT DEFAULT 0.3
