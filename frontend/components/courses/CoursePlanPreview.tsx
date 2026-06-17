@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import type { CoursePlan, CourseRequirements } from "@/hooks/useCoursePlanner";
+import type { CoursePlan, CourseRequirements, PlanVersionRecord } from "@/hooks/useCoursePlanner";
 import {
   Download,
   BookOpen,
@@ -14,18 +14,23 @@ import {
   Layers,
   CheckCircle,
   HelpCircle,
+  History,
 } from "lucide-react";
 
 interface CoursePlanPreviewProps {
   plan: CoursePlan | null;
   requirements: CourseRequirements;
   version: number;
+  versions: PlanVersionRecord[];
+  onSwitchVersion?: (versionNum: number) => void;
 }
 
 export default function CoursePlanPreview({
   plan,
   requirements,
   version,
+  versions,
+  onSwitchVersion,
 }: CoursePlanPreviewProps) {
   const [expandedModules, setExpandedModules] = useState<Record<number, boolean>>({
     0: true, // Expand first module by default
@@ -73,20 +78,42 @@ export default function CoursePlanPreview({
           </p>
         </div>
 
-        {plan && (
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-primary text-primary-foreground hover:bg-primary-hover font-medium transition-colors"
-            id="export-plan-btn"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Export JSON
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Version Switcher dropdown */}
+          {plan && versions && versions.length > 1 && onSwitchVersion && (
+            <div className="flex items-center gap-1 bg-muted/65 border border-border rounded-lg px-2 py-1 text-xs">
+              <History className="w-3.5 h-3.5 text-muted-foreground" />
+              <select
+                value={version}
+                onChange={(e) => onSwitchVersion(Number(e.target.value))}
+                className="bg-transparent text-foreground text-xs font-semibold focus:outline-none cursor-pointer"
+                title="Select course plan version"
+              >
+                {versions.map((ver) => (
+                  <option key={ver.id} value={ver.version} className="bg-card">
+                    V{ver.version} - {(ver.plan.course_title || "Course").substring(0, 15)}...
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {plan && (
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-primary hover:bg-primary-hover text-white font-semibold transition-colors"
+              id="export-plan-btn"
+              title="Download course plan JSON"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {/* Requirements status board */}
+        {/* Requirements checklist dashboard */}
         {hasRequirements && !plan && (
           <div className="glass rounded-xl p-4 animate-fade-in space-y-3">
             <h3 className="text-xs font-semibold text-foreground tracking-wider uppercase">
@@ -119,7 +146,7 @@ export default function CoursePlanPreview({
                     <p className="text-[10px] text-muted-foreground uppercase leading-tight">
                       {item.label}
                     </p>
-                    <p className="text-xs font-medium text-foreground truncate leading-tight mt-0.5">
+                    <p className="text-xs font-semibold text-foreground truncate leading-tight mt-0.5 animate-fade-in">
                       {item.value || "Not specified"}
                     </p>
                   </div>
@@ -133,14 +160,14 @@ export default function CoursePlanPreview({
         {!plan && !hasRequirements && (
           <div className="h-full flex flex-col items-center justify-center text-center py-20 animate-fade-in">
             <FileJson className="w-12 h-12 text-muted-foreground/30 mb-3" />
-            <p className="text-sm font-medium text-card-foreground">No plan generated yet</p>
-            <p className="text-xs text-muted-foreground max-w-xs mt-1">
-              Start chatting on the left to set course targets, then click generate.
+            <p className="text-sm font-semibold text-card-foreground">No plan generated yet</p>
+            <p className="text-xs text-muted-foreground max-w-xs mt-1 leading-relaxed">
+              Type details in the chat window to begin. You need at least a topic/subject and target audience to build the curriculum.
             </p>
           </div>
         )}
 
-        {/* Course Plan Visual Preview */}
+        {/* Course Plan Visual Renderer */}
         {plan && (
           <div className="space-y-4 animate-fade-in">
             {/* Plan Header Card */}
@@ -148,26 +175,26 @@ export default function CoursePlanPreview({
               <h1 className="text-lg font-bold text-foreground leading-snug">
                 {plan.course_title}
               </h1>
-              <p className="text-sm text-muted-foreground leading-relaxed">
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 {plan.description}
               </p>
 
               {/* Badges */}
               <div className="flex flex-wrap gap-2 pt-1">
                 {plan.target_audience && (
-                  <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
                     <GraduationCap className="w-3.5 h-3.5" />
                     {plan.target_audience}
                   </span>
                 )}
                 {plan.skill_level && (
-                  <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-secondary/10 text-secondary border border-secondary/20">
+                  <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-secondary/10 text-secondary border border-secondary/20 font-medium">
                     <Layers className="w-3.5 h-3.5" />
                     {plan.skill_level}
                   </span>
                 )}
                 {plan.total_duration && (
-                  <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
+                  <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 font-medium">
                     <Clock className="w-3.5 h-3.5" />
                     {plan.total_duration}
                   </span>
@@ -189,10 +216,11 @@ export default function CoursePlanPreview({
                     className="glass rounded-xl overflow-hidden border border-border"
                     id={`module-card-${modIdx}`}
                   >
-                    {/* Module Header */}
+                    {/* Module Header Toggle */}
                     <button
                       onClick={() => toggleModule(modIdx)}
-                      className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-muted/30 transition-colors text-left"
+                      className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-muted/30 transition-colors text-left focus:outline-none"
+                      aria-expanded={isOpen}
                     >
                       <div className="min-w-0 pr-4">
                         <span className="text-[10px] text-primary font-bold tracking-wider uppercase">
@@ -209,7 +237,7 @@ export default function CoursePlanPreview({
                       )}
                     </button>
 
-                    {/* Module Content */}
+                    {/* Module Body Content */}
                     {isOpen && (
                       <div className="px-4 pb-4 pt-1 border-t border-border/40 space-y-4 bg-muted/10">
                         {mod.description && (
@@ -228,7 +256,7 @@ export default function CoursePlanPreview({
                               {mod.lessons.map((les, lesIdx) => (
                                 <div
                                   key={lesIdx}
-                                  className="p-3 rounded-lg bg-card border border-border/50 space-y-2"
+                                  className="p-3 rounded-lg bg-card border border-border/50 space-y-2 hover:border-primary/25 transition-colors"
                                 >
                                   <div className="flex items-start justify-between gap-4">
                                     <h6 className="text-xs font-semibold text-foreground leading-snug">
@@ -260,7 +288,7 @@ export default function CoursePlanPreview({
 
                                   {/* Resources */}
                                   {les.resources?.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 items-center">
+                                    <div className="flex flex-wrap gap-1 items-center pt-0.5">
                                       <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mr-1">
                                         Resources:
                                       </span>

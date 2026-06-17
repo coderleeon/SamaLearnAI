@@ -211,3 +211,18 @@ async def get_latest_course_plan(session_id: str):
         "requirements": row.get("requirements") or {},
         "created_at": row["created_at"],
     }
+
+
+@router.get("/sessions/{session_id}/course-plans")
+async def get_all_course_plans(session_id: str):
+    """Retrieve all saved versions of the course plan for a session."""
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("course_plans")
+        .select("id, version, plan, requirements, created_at")
+        .eq("session_id", session_id)
+        .order("version", desc=True)
+        .execute()
+    )
+    return result.data or []
+

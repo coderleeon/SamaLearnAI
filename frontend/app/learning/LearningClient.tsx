@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Plus, PanelLeftClose, PanelLeft } from "lucide-react";
+import { ArrowLeft, BookOpen, Plus, PanelLeftClose, PanelLeft, WifiOff, RefreshCw } from "lucide-react";
 import { createSession } from "@/lib/api";
 import { useChat } from "@/hooks/useChat";
 import { useSources } from "@/hooks/useSources";
@@ -12,6 +12,7 @@ import SourcePanel from "@/components/sources/SourcePanel";
 export default function LearningClient() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [sessionError, setSessionError] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const {
@@ -28,6 +29,7 @@ export default function LearningClient() {
     isUploading,
     uploadError,
     handleUpload,
+    handleAddUrl,
     loadSources,
     clearUploadError,
   } = useSources();
@@ -37,13 +39,25 @@ export default function LearningClient() {
     initSession();
   }, []);
 
+  // Set default sidebar state depending on viewport width on initial render
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false);
+      }
+    }
+  }, []);
+
   async function initSession() {
     setIsCreatingSession(true);
+    setSessionError(false);
     try {
       const session = await createSession("learning", "Learning Session");
       setSessionId(session.id);
+      await loadSources(session.id);
     } catch (err) {
       console.error("Failed to create session:", err);
+      setSessionError(true);
     } finally {
       setIsCreatingSession(false);
     }
@@ -51,14 +65,15 @@ export default function LearningClient() {
 
   const handleNewSession = useCallback(async () => {
     setIsCreatingSession(true);
+    setSessionError(false);
     try {
       const session = await createSession("learning", "Learning Session");
       setSessionId(session.id);
-      // Clear local state by reloading
+      // Clear state by refreshing page
       window.location.reload();
     } catch (err) {
       console.error("Failed to create session:", err);
-    } finally {
+      setSessionError(true);
       setIsCreatingSession(false);
     }
   }, []);
@@ -81,13 +96,46 @@ export default function LearningClient() {
     [sessionId, handleUpload]
   );
 
+  const handleAddLink = useCallback(
+    (url: string, type: "youtube" | "website") => {
+      if (sessionId) {
+        handleAddUrl(sessionId, url, type);
+      }
+    },
+    [sessionId, handleAddUrl]
+  );
+
   const readySources = sources.filter((s) => s.status === "ready");
   const hasReadySources = readySources.length > 0;
+
+  // Offline / connection failure full screen overlay
+  if (sessionError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen w-screen bg-background px-6">
+        <div className="glass max-w-md w-full rounded-2xl p-6 text-center animate-fade-in glow space-y-4 border-destructive/20">
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto">
+            <WifiOff className="w-8 h-8 text-destructive animate-pulse" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Connection Error</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Could not connect to the database. Make sure the backend server and Supabase database connection details are correctly configured.
+          </p>
+          <button
+            onClick={initSession}
+            className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4 animate-spin-hover" />
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Top bar */}
-      <header className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card/50 backdrop-blur-sm z-10">
+      <header className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card/50 backdrop-blur-sm z-20">
         <div className="flex items-center gap-3">
           {/* Sidebar toggle */}
           <button
@@ -136,11 +184,11 @@ export default function LearningClient() {
       </header>
 
       {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Source sidebar */}
         {sidebarOpen && (
           <aside
-            className="w-72 border-r border-border bg-card/30 flex-shrink-0 animate-fade-in"
+            className="w-72 border-r border-border bg-card/30 flex-shrink-0 animate-fade-in absolute md:relative h-full z-10 md:z-0 backdrop-blur-md md:backdrop-blur-none"
             id="source-sidebar"
           >
             <SourcePanel
@@ -148,6 +196,7 @@ export default function LearningClient() {
               isUploading={isUploading}
               uploadError={uploadError}
               onUpload={handleFileUpload}
+              onAddUrl={handleAddLink}
               onClearError={clearUploadError}
               disabled={!sessionId}
             />
@@ -161,7 +210,7 @@ export default function LearningClient() {
               <div className="flex flex-col items-center gap-3 animate-fade-in">
                 <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                 <p className="text-sm text-muted-foreground">
-                  Creating session...
+                  Initializing sandbox...
                 </p>
               </div>
             </div>

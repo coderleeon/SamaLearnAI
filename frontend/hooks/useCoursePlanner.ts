@@ -49,15 +49,25 @@ export interface CoursePlan {
   modules?: Module[];
 }
 
+export interface PlanVersionRecord {
+  id: string;
+  version: number;
+  plan: CoursePlan;
+  requirements: CourseRequirements;
+  created_at: string;
+}
+
 interface UseCoursePlannerReturn {
   messages: ChatMessage[];
   requirements: CourseRequirements;
   activePlan: CoursePlan | null;
   planVersion: number;
+  versions: PlanVersionRecord[];
   isLoading: boolean;
   error: string | null;
   sendPlannerMessage: (sessionId: string, message: string) => Promise<void>;
   loadSessionPlan: (sessionId: string) => Promise<void>;
+  switchVersion: (versionNum: number) => void;
   clearError: () => void;
 }
 
@@ -71,6 +81,7 @@ export function useCoursePlanner(): UseCoursePlannerReturn {
   const [requirements, setRequirements] = useState<CourseRequirements>({});
   const [activePlan, setActivePlan] = useState<CoursePlan | null>(null);
   const [planVersion, setPlanVersion] = useState(0);
+  const [versions, setVersions] = useState<PlanVersionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,12 +116,31 @@ export function useCoursePlanner(): UseCoursePlannerReturn {
           }))
         );
       }
+
+      // 3. Get All Plan Versions
+      const versionsRes = await fetch(`/api/v1/sessions/${sessionId}/course-plans`);
+      if (versionsRes.ok) {
+        const versionsData = await versionsRes.json();
+        setVersions(versionsData || []);
+      }
     } catch (err) {
       setError("Failed to load plan history.");
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const switchVersion = useCallback(
+    (versionNum: number) => {
+      const match = versions.find((v) => v.version === versionNum);
+      if (match) {
+        setActivePlan(match.plan);
+        setRequirements(match.requirements);
+        setPlanVersion(match.version);
+      }
+    },
+    [versions]
+  );
 
   const sendPlannerMessage = useCallback(
     async (sessionId: string, message: string) => {
@@ -141,6 +171,9 @@ export function useCoursePlanner(): UseCoursePlannerReturn {
           message: message.trim(),
         });
 
+        let updatedPlan: CoursePlan | null = null;
+        let updatedReqs: CourseRequirements | null = null;
+
         for await (const { event, data } of stream) {
           if (event === "token") {
             try {
@@ -158,6 +191,7 @@ export function useCoursePlanner(): UseCoursePlannerReturn {
             try {
               const reqs = JSON.parse(data);
               setRequirements(reqs);
+              updatedReqs = reqs;
             } catch {
               // skip
             }
@@ -165,6 +199,7 @@ export function useCoursePlanner(): UseCoursePlannerReturn {
             try {
               const plan = JSON.parse(data);
               setActivePlan(plan);
+              updatedPlan = plan;
               setPlanVersion((prev) => prev + 1);
             } catch {
               // skip
@@ -184,6 +219,25 @@ export function useCoursePlanner(): UseCoursePlannerReturn {
             m.id === assistantId ? { ...m, isStreaming: false } : m
           )
         );
+
+        // Fetch updated versions list from DB
+        const versionsRes = await fetch(`/api/v1/sessions/${sessionId}/course-plans`);
+        if (versionsRes.ok) {
+          const versionsData = await versionsRes.json();
+          setVersions(versionsData || []);
+        } else if (updatedPlan && updatedReqs) {
+          // Fallback update optimistically
+          setVersions((prev) => [
+            {
+              id: `opt-${Date.now()}`,
+              version: planVersion + 1,
+              plan: updatedPlan!,
+              requirements: updatedReqs!,
+              created_at: new Date().toISOString(),
+            },
+            ...prev,
+          ]);
+        }
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "Failed to send message";
@@ -193,7 +247,7 @@ export function useCoursePlanner(): UseCoursePlannerReturn {
         setIsLoading(false);
       }
     },
-    [isLoading]
+    [isLoading, planVersion]
   );
 
   return {
@@ -201,10 +255,12 @@ export function useCoursePlanner(): UseCoursePlannerReturn {
     requirements,
     activePlan,
     planVersion,
+    versions,
     isLoading,
     error,
     sendPlannerMessage,
     loadSessionPlan,
+    switchVersion,
     clearError,
   };
 }
