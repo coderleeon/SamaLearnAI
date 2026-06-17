@@ -67,15 +67,18 @@ async def health_check():
 
 
 # ---------------------------------------------------------------------------
-# Route registration (stubs — routers added in later phases)
+# Route registration
 # ---------------------------------------------------------------------------
 
-# from backend.api.chat import router as chat_router
-# from backend.api.sources import router as sources_router
+from backend.api.sessions import router as sessions_router
+from backend.api.sources import router as sources_router
+from backend.api.chat import router as chat_router
+
+app.include_router(sessions_router, prefix="/api/v1", tags=["sessions"])
+app.include_router(sources_router, prefix="/api/v1", tags=["sources"])
+app.include_router(chat_router, prefix="/api/v1", tags=["chat"])
+
+# Phase 4+: Course planner routes
 # from backend.api.courses import router as courses_router
-# from backend.api.sessions import router as sessions_router
-#
-# app.include_router(sessions_router, prefix="/api/v1", tags=["sessions"])
-# app.include_router(sources_router, prefix="/api/v1", tags=["sources"])
-# app.include_router(chat_router, prefix="/api/v1", tags=["chat"])
 # app.include_router(courses_router, prefix="/api/v1", tags=["courses"])
+

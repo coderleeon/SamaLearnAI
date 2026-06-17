@@ -19,10 +19,15 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str  # Use the service_role key (bypasses RLS)
 
     # --- Google Gemini ---
-    GOOGLE_API_KEY: str
+    GOOGLE_API_KEY: str | None = None
     GEMINI_CHAT_MODEL: str = "gemini-2.5-flash"
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-001"
     EMBEDDING_DIMENSIONS: int = 3072
+
+    # --- OpenRouter ---
+    OPENROUTER_API_KEY: str | None = None
+    OPENROUTER_CHAT_MODEL: str = "google/gemini-2.5-flash"
+
 
     # --- RAG Configuration ---
     CHUNK_SIZE: int = 512
