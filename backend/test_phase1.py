@@ -332,16 +332,91 @@ class TestWebParser(unittest.TestCase):
 
 class TestYoutubeParser(unittest.TestCase):
     @patch("backend.parsers.youtube_parser.YouTubeTranscriptApi")
-    def test_parse_youtube_success(self, mock_api):
-        mock_api.get_transcript.return_value = [
-            {"text": "Hello, welcome to this video lesson about learning.", "start": 10.5}
-        ]
-        
+    def test_parse_youtube_success(self, mock_api_class):
+        """Transcript fetch returns snippet objects with .text/.start/.duration."""
+        from unittest.mock import MagicMock
+
+        snippet = MagicMock()
+        snippet.text = "Hello, welcome to this video lesson about learning."
+        snippet.start = 10.5
+        snippet.duration = 3.0
+
+        # FetchedTranscript is iterable over snippets
+        mock_transcript = MagicMock()
+        mock_transcript.__iter__ = MagicMock(return_value=iter([snippet]))
+
+        mock_instance = MagicMock()
+        mock_instance.fetch.return_value = mock_transcript
+        mock_api_class.return_value = mock_instance
+
         result = parse_youtube("https://www.youtube.com/watch?v=12345678901")
         self.assertEqual(len(result), 1)
         self.assertIn("welcome to this video lesson", result[0]["content"])
         self.assertEqual(result[0]["metadata"]["timestamp"], "00:10")
+        self.assertEqual(result[0]["metadata"]["source_type"], "youtube")
+        self.assertEqual(result[0]["metadata"]["video_id"], "12345678901")
+
+        mock_instance.fetch.assert_called_once_with("12345678901")
+
+    @patch("backend.parsers.youtube_parser.YouTubeTranscriptApi")
+    def test_parse_youtube_transcripts_disabled(self, mock_api_class):
+        """Graceful error when transcripts are disabled on the video."""
+        from youtube_transcript_api import TranscriptsDisabled
+
+        mock_instance = MagicMock()
+        mock_instance.fetch.side_effect = TranscriptsDisabled("test_id")
+        mock_api_class.return_value = mock_instance
+
+        with self.assertRaises(RuntimeError) as ctx:
+            parse_youtube("https://www.youtube.com/watch?v=12345678901")
+        self.assertIn("disabled", str(ctx.exception).lower())
+
+    @patch("backend.parsers.youtube_parser.YouTubeTranscriptApi")
+    def test_parse_youtube_video_unavailable(self, mock_api_class):
+        """Graceful error when the video is unavailable."""
+        from youtube_transcript_api import VideoUnavailable
+
+        mock_instance = MagicMock()
+        mock_instance.fetch.side_effect = VideoUnavailable("test_id")
+        mock_api_class.return_value = mock_instance
+
+        with self.assertRaises(RuntimeError) as ctx:
+            parse_youtube("https://www.youtube.com/watch?v=12345678901")
+        self.assertIn("unavailable", str(ctx.exception).lower())
+
+    def test_parse_youtube_invalid_url(self):
+        """ValueError for a URL that does not contain a valid video ID."""
+        with self.assertRaises(ValueError):
+            parse_youtube("https://www.youtube.com/")
+
+    @patch("backend.parsers.youtube_parser.YouTubeTranscriptApi")
+    def test_parse_youtube_timestamp_grouping(self, mock_api_class):
+        """Snippets are grouped into ~1000 char windows with correct timestamps."""
+        from unittest.mock import MagicMock
+
+        # Build enough snippets to trigger a window break (>1000 chars)
+        snippets = []
+        for i in range(30):
+            s = MagicMock()
+            s.text = f"Word number {i} " * 5  # ~75 chars each
+            s.start = float(i * 10)
+            s.duration = 5.0
+            snippets.append(s)
+
+        mock_transcript = MagicMock()
+        mock_transcript.__iter__ = MagicMock(return_value=iter(snippets))
+
+        mock_instance = MagicMock()
+        mock_instance.fetch.return_value = mock_transcript
+        mock_api_class.return_value = mock_instance
+
+        result = parse_youtube("https://www.youtube.com/watch?v=12345678901")
+        # Should have multiple pages since total chars >> 1000
+        self.assertGreater(len(result), 1)
+        # First page timestamp should be 00:00
+        self.assertEqual(result[0]["metadata"]["timestamp"], "00:00")
 
 
 if __name__ == "__main__":
     unittest.main()
+
