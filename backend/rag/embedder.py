@@ -40,6 +40,9 @@ def embed_texts(texts: list[str], batch_size: int = 50) -> list[list[float]]:
         result = client.models.embed_content(
             model=settings.GEMINI_EMBEDDING_MODEL,
             contents=batch,
+            config=genai.types.EmbedContentConfig(
+                output_dimensionality=settings.EMBEDDING_DIMENSIONS
+            ),
         )
         for embedding in result.embeddings:
             all_embeddings.append(embedding.values)

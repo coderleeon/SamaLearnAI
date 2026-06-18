@@ -82,6 +82,7 @@ class TestEmbedder(unittest.TestCase):
     def test_embed_texts_batched(self, mock_settings, mock_get_client):
         # Setup settings and client mock
         mock_settings.return_value.GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"
+        mock_settings.return_value.EMBEDDING_DIMENSIONS = 768
         mock_client = MagicMock()
         mock_response = MagicMock()
         
@@ -99,9 +100,13 @@ class TestEmbedder(unittest.TestCase):
         result = embed_texts(texts, batch_size=2)
 
         self.assertEqual(result, [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        import google.genai as genai
         mock_client.models.embed_content.assert_called_once_with(
             model="gemini-embedding-001",
-            contents=texts
+            contents=texts,
+            config=genai.types.EmbedContentConfig(
+                output_dimensionality=768
+            )
         )
 
     @patch("backend.rag.embedder.embed_texts")
