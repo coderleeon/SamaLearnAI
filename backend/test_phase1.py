@@ -5,6 +5,9 @@ from unittest.mock import MagicMock, patch, mock_open
 
 # Import system under test
 from backend.parsers.pdf_parser import parse_pdf
+from backend.parsers.pptx_parser import parse_pptx
+from backend.parsers.web_parser import parse_website
+from backend.parsers.youtube_parser import parse_youtube
 from backend.rag.chunker import chunk_pages
 from backend.rag.embedder import embed_texts, embed_query
 from backend.rag.retriever import retrieve_chunks, store_chunks
@@ -286,6 +289,58 @@ class TestLearningGraph(unittest.TestCase):
         self.assertIn("generate_answer", learning_graph.nodes)
         self.assertIn("format_citations", learning_graph.nodes)
         self.assertIn("save_messages", learning_graph.nodes)
+
+
+class TestPPTXParser(unittest.TestCase):
+    @patch("backend.parsers.pptx_parser.Presentation")
+    def test_parse_pptx_success(self, mock_pres):
+        mock_prs_instance = MagicMock()
+        mock_slide = MagicMock()
+        mock_shape = MagicMock()
+        mock_shape.has_text_frame = True
+        mock_para = MagicMock()
+        mock_run = MagicMock()
+        mock_run.text = "Slide content"
+        mock_para.runs = [mock_run]
+        mock_shape.text_frame.paragraphs = [mock_para]
+        mock_slide.shapes = [mock_shape]
+        
+        mock_prs_instance.slides = [mock_slide]
+        mock_pres.return_value = mock_prs_instance
+        
+        result = parse_pptx(b"dummy_ppt_bytes", "test.pptx")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["content"], "Slide content")
+        self.assertEqual(result[0]["metadata"]["source_type"], "pptx")
+
+
+class TestWebParser(unittest.TestCase):
+    @patch("httpx.Client")
+    def test_parse_web_success(self, mock_client_class):
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "<html><head><title>Test Site</title></head><body><p>This is a paragraph of text content that needs to be longer than twenty characters.</p></body></html>"
+        mock_client.get.return_value = mock_response
+        mock_client_class.return_value.__enter__.return_value = mock_client
+        
+        result = parse_website("https://example.com")
+        self.assertEqual(len(result), 1)
+        self.assertIn("This is a paragraph of text content", result[0]["content"])
+        self.assertEqual(result[0]["metadata"]["filename"], "Test Site")
+
+
+class TestYoutubeParser(unittest.TestCase):
+    @patch("backend.parsers.youtube_parser.YouTubeTranscriptApi")
+    def test_parse_youtube_success(self, mock_api):
+        mock_api.get_transcript.return_value = [
+            {"text": "Hello, welcome to this video lesson about learning.", "start": 10.5}
+        ]
+        
+        result = parse_youtube("https://www.youtube.com/watch?v=12345678901")
+        self.assertEqual(len(result), 1)
+        self.assertIn("welcome to this video lesson", result[0]["content"])
+        self.assertEqual(result[0]["metadata"]["timestamp"], "00:10")
 
 
 if __name__ == "__main__":

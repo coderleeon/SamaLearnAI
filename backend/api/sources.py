@@ -10,6 +10,9 @@ from pydantic import BaseModel
 from backend.services.supabase import get_supabase_client
 from backend.services.models import SourceUploadResponse, SourceStatusResponse
 from backend.parsers.pdf_parser import parse_pdf
+from backend.parsers.pptx_parser import parse_pptx
+from backend.parsers.web_parser import parse_website
+from backend.parsers.youtube_parser import parse_youtube
 from backend.rag.chunker import chunk_pages
 from backend.rag.embedder import embed_texts
 from backend.rag.retriever import store_chunks
@@ -78,8 +81,11 @@ async def upload_source(
                 "file_size_bytes": len(file_bytes),
             }
         elif source_type == "pptx":
-            # PPTX parser will be added in Phase 3 — for now, fail gracefully
-            raise HTTPException(status_code=501, detail="PPTX parsing coming in Phase 3")
+            pages = parse_pptx(file_bytes, filename)
+            source_meta = {
+                "page_count": len(pages),
+                "file_size_bytes": len(file_bytes),
+            }
         else:
             raise HTTPException(status_code=400, detail="Unsupported source type")
 
@@ -166,19 +172,57 @@ async def add_url_source(body: UrlSourceRequest):
     source_id = source_result.data[0]["id"]
 
     try:
-        # YouTube and Website parsers will be added in Phase 3
-        # For now, return a placeholder
-        raise HTTPException(
-            status_code=501,
-            detail=f"{body.source_type} parsing coming in Phase 3",
+        if body.source_type == "youtube":
+            pages = parse_youtube(body.url)
+            display_name = f"YouTube: {body.url.split('v=')[-1][:11]}"
+        elif body.source_type == "website":
+            pages = parse_website(body.url)
+            display_name = pages[0]["metadata"]["filename"] if pages else body.url
+        else:
+            raise ValueError("Unsupported source type")
+
+        # Update source name from display_name
+        supabase.table("sources").update({"name": display_name}).eq("id", source_id).execute()
+
+        # Chunk the pages
+        chunks = chunk_pages(pages)
+        if not chunks:
+            raise ValueError("No content could be extracted from the URL")
+
+        # Generate embeddings
+        texts = [c["content"] for c in chunks]
+        embeddings = embed_texts(texts)
+
+        # Store chunks + embeddings in Supabase
+        stored_count = store_chunks(source_id, chunks, embeddings)
+
+        # Update source status to ready
+        source_meta = {
+            "url": body.url,
+            "chunk_count": stored_count,
+        }
+        supabase.table("sources").update({
+            "status": "ready",
+            "metadata": source_meta,
+        }).eq("id", source_id).execute()
+
+        return SourceUploadResponse(
+            id=source_id,
+            session_id=body.session_id,
+            source_type=body.source_type,
+            name=display_name,
+            status="ready",
+            metadata=source_meta,
         )
 
-    except HTTPException:
+    except Exception as e:
+        # Mark source as error
         supabase.table("sources").update({
             "status": "error",
-            "metadata": {"error": "Parser not yet implemented"},
+            "metadata": {"error": str(e)},
         }).eq("id", source_id).execute()
-        raise
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
 
 # ---------------------------------------------------------------------------
