@@ -89,6 +89,8 @@ def _call_llm_non_stream(system_prompt: str, user_prompt: str) -> str:
                 data = response.json()
                 return data["choices"][0]["message"]["content"]
             else:
+                if response.status_code == 402:
+                    raise ValueError("The AI service has run out of query credits. Please check your provider account balance.")
                 raise Exception(f"OpenRouter API error: {response.text}")
 
     # Fallback to direct Gemini
@@ -313,11 +315,14 @@ def ask_clarifying_question(state: CourseState) -> dict:
             "model": settings.OPENROUTER_CHAT_MODEL,
             "messages": messages,
             "temperature": 0.5,
+            "max_tokens": 1024,
             "stream": True,
         }
         with httpx.Client(timeout=60.0) as client:
             with client.stream("POST", "https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers) as r:
                 if r.status_code != 200:
+                    if r.status_code == 402:
+                        raise ValueError("The AI service has run out of query credits. Please check your provider account balance.")
                     raise Exception(f"OpenRouter error: {r.read().decode('utf-8')}")
                 for line in r.iter_lines():
                     line = line.strip()
@@ -445,11 +450,14 @@ def generate_plan(state: CourseState) -> dict:
             "model": settings.OPENROUTER_CHAT_MODEL,
             "messages": messages,
             "temperature": 0.4,
+            "max_tokens": 1024,
             "stream": True,
         }
         with httpx.Client(timeout=60.0) as client:
             with client.stream("POST", "https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers) as r:
                 if r.status_code != 200:
+                    if r.status_code == 402:
+                        raise ValueError("The AI service has run out of query credits. Please check your provider account balance.")
                     raise Exception(f"OpenRouter error: {r.read().decode('utf-8')}")
                 for line in r.iter_lines():
                     line = line.strip()
@@ -607,11 +615,14 @@ def refine_plan(state: CourseState) -> dict:
             "model": settings.OPENROUTER_CHAT_MODEL,
             "messages": messages,
             "temperature": 0.4,
+            "max_tokens": 1024,
             "stream": True,
         }
         with httpx.Client(timeout=60.0) as client:
             with client.stream("POST", "https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers) as r:
                 if r.status_code != 200:
+                    if r.status_code == 402:
+                        raise ValueError("The AI service has run out of query credits. Please check your provider account balance.")
                     raise Exception(f"OpenRouter error: {r.read().decode('utf-8')}")
                 for line in r.iter_lines():
                     line = line.strip()

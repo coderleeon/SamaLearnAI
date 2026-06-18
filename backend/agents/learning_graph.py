@@ -227,7 +227,7 @@ def generate_answer(state: LearningState) -> dict:
             "model": settings.OPENROUTER_CHAT_MODEL,
             "messages": messages,
             "temperature": 0.3,
-            "max_tokens": 2048,
+            "max_tokens": 1024,
             "stream": True,
         }
         
@@ -236,6 +236,8 @@ def generate_answer(state: LearningState) -> dict:
         with httpx.Client(timeout=60.0) as client:
             with client.stream("POST", "https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers) as response:
                 if response.status_code != 200:
+                    if response.status_code == 402:
+                        raise ValueError("The AI service has run out of query credits. Please check your provider account balance.")
                     error_text = response.read().decode("utf-8")
                     raise Exception(f"OpenRouter API error (status {response.status_code}): {error_text}")
                 
